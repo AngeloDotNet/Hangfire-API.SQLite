@@ -1,12 +1,8 @@
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using Hangfire;
-using Hangfire.Storage.SQLite;
+using Hangfire.SQLite;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -24,12 +20,15 @@ namespace Hangfire_API_SQLite
 
         public void ConfigureServices(IServiceCollection services)
         {
-            string connectionString = Configuration.GetSection("ConnectionStrings").GetValue<string>("Default");
+            var options = new SQLiteStorageOptions();
+            options.QueuePollInterval = TimeSpan.FromSeconds(30);
 
             services.AddHangfire(configuration => configuration
+                .SetDataCompatibilityLevel(CompatibilityLevel.Version_170)
                 .UseSimpleAssemblyNameTypeSerializer()
                 .UseRecommendedSerializerSettings()
-                .UseSQLiteStorage(connectionString));
+                .UseSQLiteStorage(Configuration.GetConnectionString("Default"), options));
+
             services.AddHangfireServer();
             
             services.AddMvc();
@@ -43,7 +42,19 @@ namespace Hangfire_API_SQLite
             }
 
             app.UseHttpsRedirection();
-            app.UseHangfireDashboard();
+
+            var option = new BackgroundJobServerOptions { 
+                WorkerCount = 1
+            };
+            var dashboardOptions = new DashboardOptions
+            {
+                DashboardTitle = "TITOLO DASHBOARD",
+                DisplayStorageConnectionString = false
+            };
+
+            app.UseHangfireServer(option);
+            app.UseHangfireDashboard("/hangfire", dashboardOptions);
+
             app.UseRouting();
 
             app.UseEndpoints(endpoints =>
